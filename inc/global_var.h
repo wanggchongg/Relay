@@ -8,26 +8,27 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#define T_MAX 1024
-#define MAXLINE sizeof(FrameHeader_t)+T_MAX
-#define MAXBUFSIZE 2
-
-typedef struct FrameHeader_t{
-    int frame_no;
-    long slice_no;
-    int frame_type;
-    long F;
-    int T;
-    int K;
-    int R;
-    int esi;
-    int camera_no;
+typedef struct FrameHeader_t
+{
+	int frame_no;
+	long slice_no;
+	int frame_type;
+	long F;
+	int T;
+	int K;
+	int R;
+	int esi;
+	int camera_no;
 }FrameHeader_t;
+
+#define T_MAX 1024
+#define MAXLINE (sizeof(FrameHeader_t)+T_MAX)
+#define MAXBUFSIZE 2
 
 typedef struct
 {
-    void *arg1;
-    void *arg2;
+	void *arg1;
+	void *arg2;
 }DoubleArg_t;
 
 /*********************************************************************/
@@ -42,28 +43,28 @@ typedef struct
 
 typedef struct
 {
-    uint8 *buffer;
-    int frameNo;
-    int size;
-    int cameraNo;
+	uint8 *buffer;
+	int frameNo;
+	int size;
+	int cameraNo;
 }Frame_t;
 
 typedef struct
 {
-    sem_t sem_empty;
-    sem_t sem_full;
-    int sig_put;
-    int sig_get;
-    Frame_t **frame;
+	sem_t sem_empty;
+	sem_t sem_full;
+	int sig_put;
+	int sig_get;
+	Frame_t **frame;
 }EncodeBuffer_t;
 
 typedef struct
 {
-    sem_t sem_empty;
-    sem_t sem_full;
-    int sig_put;
-    int sig_get;
-    uint8 *buffer;
+	sem_t sem_empty;
+	sem_t sem_full;
+	int sig_put;
+	int sig_get;
+	uint8 *buffer;
 }SendBuffer_t;
 /*********************************************************************/
 

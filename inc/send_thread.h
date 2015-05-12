@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include "global_var.h"
 
+void *send_malloc(int buf_num, int buf_len);
 int send_func(uint8_t *, int, SendBuffer_t *);
 
 #endif //SEND_THREAD_H

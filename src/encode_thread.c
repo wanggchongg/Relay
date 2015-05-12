@@ -2,6 +2,34 @@
 
 static void *encode_thread(void *);
 
+void *encode_malloc(int buf_num, int buf_len)
+{
+	EncodeBuffer_t *buf = NULL;
+	if((buf = (EncodeBuffer_t *)malloc(sizeof(EncodeBuffer_t))) == NULL)
+		return NULL;
+	if((buf->frame = (Frame_t **)malloc(buf_num*sizeof(Frame_t *))) == NULL)
+		return NULL;
+
+	int i = 0;
+	for(i=0; i<buf_num; i++)
+	{
+		if((buf->frame[i] = (Frame_t *)malloc(sizeof(Frame_t))) == NULL)
+			return NULL;
+		if((buf->frame[i]->buffer = (uint8 *)malloc(buf_len)) == NULL)
+			return NULL;
+		buf->frame[i]->frameNo = 0;
+		buf->frame[i]->size = 0;
+		memset(buf->frame[i]->buffer, 0, buf_len);
+	}
+
+	sem_init(&buf->sem_empty, 0, buf_num);
+	sem_init(&buf->sem_full, 0, 0);
+	buf->sig_put = 0;
+	buf->sig_get = 0;
+
+	return (void *)buf;
+}
+
 int encode_func(EncodeBuffer_t *encodeBuf, SendBuffer_t *sendBuf)
 {
 	int err;
@@ -40,6 +68,7 @@ static void *encode_thread(void *arg)
 
 	while(1)
 	{
+		printf("encode_thread started...\n");
 		if(!frameBuf)
 			frameBuf = (uint8 *)malloc(20000);
 		sem_wait(&encodeBuf->sem_full);
@@ -96,7 +125,7 @@ static void *encode_thread(void *arg)
 			frameHeader->esi = htonl(i);
 
 			sem_wait(&sendBuf->sem_empty);
-			memcpy(sendBuf->buffer+(T+sizeof(FrameHeader_t))*sendBuf->sig_put, frameHeader, sizeof(frameHeader));
+			memcpy(sendBuf->buffer+(T+sizeof(FrameHeader_t))*sendBuf->sig_put, frameHeader, sizeof(FrameHeader_t));
 			memcpy(sendBuf->buffer+(T+sizeof(FrameHeader_t))*sendBuf->sig_put+sizeof(FrameHeader_t), outputBuf+i*T, T);
 			sendBuf->sig_put = (sendBuf->sig_put+1)%20;
 			sem_post(&sendBuf->sem_full);

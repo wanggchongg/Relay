@@ -2,17 +2,17 @@
 
 static void *recv_thread(void *);
 
-int recv_func(uint8_t *IP, int Port, DecodeBuffer_t *decodeBuf)
+int recv_func(char *IP, int Port, DecodeBuffer_t *decodeBuf)
 {
 	int err = 0;
 	pthread_t tid;
-	int 			   listenfd;
+	int  listenfd;
 	struct sockaddr_in servaddr;
 
 	memset(&servaddr, '\0', sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(Port);
-	if(strlen(IP))
+	if(IP)
 	{
 		if(inet_pton(AF_INET, IP, &servaddr.sin_addr) <= 0)
 		{
@@ -32,9 +32,9 @@ int recv_func(uint8_t *IP, int Port, DecodeBuffer_t *decodeBuf)
 	int on=1;
 	if(setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0)  //设置套接字选项避免地址使用错误:address already in use
 	{
-        perror("\trecv_func: UDP socket setsockopt failed");
-        close(listenfd);
-        return -2;
+		perror("\trecv_func: UDP socket setsockopt failed");
+		close(listenfd);
+		return -2;
 	}
 
 	if(bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
@@ -57,19 +57,14 @@ int recv_func(uint8_t *IP, int Port, DecodeBuffer_t *decodeBuf)
 	return 0;
 }
 
-
-/**
- * [udpRecv_thread udp接收处理线程]
- * @param  arg [缓存区和ip地址端口号]
- */
 static void *recv_thread(void *arg)
 {
 	DecodeBuffer_t *decodeBuf = (DecodeBuffer_t *)((DoubleArg_t *)arg)->arg1;
 	int listenfd = *(int *)((DoubleArg_t *)arg)->arg2;
 	pthread_detach(pthread_self()); //使线程处理分离状态
 
-	ssize_t clilen;
-	struct sockaddr_in	cliaddr;
+	socklen_t clilen;
+	struct sockaddr_in  cliaddr;
 
 	uint8_t *message = NULL;
 	ssize_t  mesglen = 0;
@@ -78,9 +73,6 @@ static void *recv_thread(void *arg)
 	while(1)
 	{
 		printf("waiting for the UDP packet...\n");
-		memset(message, 0, MAXLINE);
-		clilen = sizeof(cliaddr);
-		memset(&cliaddr, '\0', clilen);
 
 		if((mesglen = recvfrom(listenfd, message, MAXLINE, 0, (struct sockaddr*)&cliaddr, &clilen)) < 0)
 		{
@@ -97,7 +89,6 @@ static void *recv_thread(void *arg)
 		}
 
 		sem_wait(&decodeBuf->sem_empty);
-		memset(decodeBuf->buffer[decodeBuf->sig_put], 0, MAXLINE);
 		memcpy(decodeBuf->buffer[decodeBuf->sig_put], message, mesglen);
 		sem_post(&decodeBuf->sem_full);
 		decodeBuf->sig_put = (decodeBuf->sig_put + 1) % MAXBUFSIZE;

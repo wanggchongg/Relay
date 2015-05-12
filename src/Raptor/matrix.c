@@ -2,7 +2,7 @@
 
 static uint32 search_col_1(uint8 **mat, uint32 start, uint32 row);
 static void row_exchange(uint32 row, uint32 col, uint8 **mat,uint32 matsize);
-static void row_sub(uint32 row1, uint32 row2, uint8 **mat, uint32 matsize, uint8 temp1, uint8 temp2);
+//static void row_sub(uint32 row1, uint32 row2, uint8 **mat, uint32 matsize, uint8 temp1, uint8 temp2);
 static void row_or(uint32 row1, uint32 row2, uint8 **mat, uint32 matsize);
 static void matrix_free(uint8 **mat, uint32 size);
 static void my_xor(uint8 *x, uint8 *y, uint32 size);
@@ -114,58 +114,58 @@ int matrix_inverse(Matrix_t *A, Matrix_t *A_1){
 }
 
 int matrix_equations(Matrix_t *A, uint8 *D, uint32 size){
-    uint32 i,j,search_1;
-    uint8 **matpoint;
-    matpoint = (uint8 **)malloc(A->row * sizeof(uint8 *));
-    for(i=0; i<A->row; i++){
-        matpoint[i] = (uint8 *)malloc(A->colum*sizeof(uint8));
-        memcpy(matpoint[i], A->rowpoint[i], A->colum);
-    }
-    //matpoint = A->rowpoint;
-    for(j=0; j<A->colum; j++){
-        /*/////////////
-        for(uint32 k = 0;k<A->row;k++){
-        for(uint32 m = 0; m<A->colum; m++){
-        printf("%2d ",matpoint[k][m]);
-        }
-        printf("\n");
-        }
-        printf("\n");
-        ///////////////*/
-        search_1 = search_col_1(matpoint, j, A->row);
+	uint32 i,j,search_1;
+	uint8 **matpoint;
+	matpoint = (uint8 **)malloc(A->row * sizeof(uint8 *));
+	for(i=0; i<A->row; i++){
+		matpoint[i] = (uint8 *)malloc(A->colum*sizeof(uint8));
+		memcpy(matpoint[i], A->rowpoint[i], A->colum);
+	}
+	//matpoint = A->rowpoint;
+	for(j=0; j<A->colum; j++){
+		/*/////////////
+		for(uint32 k = 0;k<A->row;k++){
+		for(uint32 m = 0; m<A->colum; m++){
+		printf("%2d ",matpoint[k][m]);
+		}
+		printf("\n");
+		}
+		printf("\n");
+		///////////////*/
+		search_1 = search_col_1(matpoint, j, A->row);
 
-        if(search_1!=j){
-            if(search_1 == -1){
-                //if(j ==
-                return 0;
-            }
-            row_exchange(j,search_1, matpoint, A->colum);
-            my_exchange(D+j*size, D+search_1*size, size);
-        }
+		if(search_1!=j){
+			if(search_1 == -1){
+				//if(j ==
+				return 0;
+			}
+			row_exchange(j,search_1, matpoint, A->colum);
+			my_exchange(D+j*size, D+search_1*size, size);
+		}
 
-        for(i=0;i<A->row; i++){
-            if(matpoint[i][j] != 0){
-                if(i!= j){
-                    //row_sub(i,j,inv_matpoint,A->colum,matpoint[j][j],matpoint[i][j]);
-                    //row_sub(i,j,matpoint,A->colum,matpoint[j][j],matpoint[i][j]);
-                    //row_or(i,j,inv_matpoint,A->colum);
-                    row_or(i,j,matpoint,A->colum);
-                    my_xor(D+i*size, D+j*size, size);
-                }
+		for(i=0;i<A->row; i++){
+			if(matpoint[i][j] != 0){
+				if(i!= j){
+					//row_sub(i,j,inv_matpoint,A->colum,matpoint[j][j],matpoint[i][j]);
+					//row_sub(i,j,matpoint,A->colum,matpoint[j][j],matpoint[i][j]);
+					//row_or(i,j,inv_matpoint,A->colum);
+					row_or(i,j,matpoint,A->colum);
+					my_xor(D+i*size, D+j*size, size);
+				}
 
-                ///////////////////////////////
-                /*for(uint32 k = 0;k<A->row;k++){
-                for(uint32 m = 0; m<A->colum; m++){
-                printf("%2d ",matpoint[k][m]);
-                }
-                printf("\n");
-                }
-                printf("\n");*/
-            }
-        }
-    }
-    matrix_free(matpoint,A->row);
-    return 1;
+				///////////////////////////////
+				/*for(uint32 k = 0;k<A->row;k++){
+				for(uint32 m = 0; m<A->colum; m++){
+				printf("%2d ",matpoint[k][m]);
+				}
+				printf("\n");
+				}
+				printf("\n");*/
+			}
+		}
+	}
+	matrix_free(matpoint,A->row);
+	return 1;
 }
 
 static uint32 search_col_1(uint8 **mat, uint32 start, uint32 matsize){
@@ -206,23 +206,23 @@ static void row_exchange(uint32 row1, uint32 row2, uint8 **mat,uint32 matsize){
 	}
 }
 
-//两列相减 row1 - row2
-static void row_sub(uint32 row1, uint32 row2, uint8 **mat, uint32 matsize, uint8 temp1, uint8 temp2){
-    uint32 i;
+// //两列相减 row1 - row2
+// static void row_sub(uint32 row1, uint32 row2, uint8 **mat, uint32 matsize, uint8 temp1, uint8 temp2){
+// 	uint32 i;
 
-    if(temp1 == 1){
-        for(i=0; i<matsize; i++){
-            mat[row1][i] = mat[row1][i] - temp2*mat[row2][i];
-        }
-    }
-    else{
-        if(temp1 != 0){
-            for(i=0; i<matsize; i++){
-                mat[row1][i] = temp1*mat[row1][i] - temp2*mat[row2][i];
-            }
-        }
-    }
-}
+// 	if(temp1 == 1){
+// 		for(i=0; i<matsize; i++){
+// 			mat[row1][i] = mat[row1][i] - temp2*mat[row2][i];
+// 		}
+// 	}
+// 	else{
+// 		if(temp1 != 0){
+// 			for(i=0; i<matsize; i++){
+// 				mat[row1][i] = temp1*mat[row1][i] - temp2*mat[row2][i];
+// 			}
+// 		}
+// 	}
+// }
 
 //两行异或 row1异或row2，结果存在row1
 static void row_or(uint32 row1, uint32 row2, uint8 **mat, uint32 matsize){
@@ -244,18 +244,18 @@ static void matrix_free(uint8 **mat, uint32 size){
 }
 
 static void my_xor(uint8 *x, uint8 *y, uint32 size){  // 计算X^Y, 结果保存在X中
-    uint32 i;
-    for(i = 0; i < size; i++)
-        x[i] ^= y[i];
-    return;
+	uint32 i;
+	for(i = 0; i < size; i++)
+		x[i] ^= y[i];
+	return;
 }
 
 static void my_exchange(uint8 *x, uint8 *y, uint32 size){
-    uint8* temp;
-    temp = (uint8*)malloc(size);
-    memcpy(temp, x, size);
-    memcpy(x, y, size);
-    memcpy(y, temp, size);
-    free(temp);
-    temp = NULL;
+	uint8* temp;
+	temp = (uint8*)malloc(size);
+	memcpy(temp, x, size);
+	memcpy(x, y, size);
+	memcpy(y, temp, size);
+	free(temp);
+	temp = NULL;
 }

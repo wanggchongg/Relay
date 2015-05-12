@@ -2,11 +2,28 @@
 
 static void *send_thread(void *);
 
-int send_func(uint8_t *IP, int Port, SendBuffer_t *sendBuf)
+void *send_malloc(int buf_num, int buf_len)
+{
+	SendBuffer_t *buf = NULL;
+	if((buf = (SendBuffer_t *)malloc(sizeof(SendBuffer_t))) == NULL)
+		return NULL;
+	if((buf->buffer = (uint8 *)malloc(buf_len)) == NULL)
+		return NULL;
+
+	sem_init(&buf->sem_empty, 0, buf_num);
+	sem_init(&buf->sem_full, 0, 0);
+	buf->sig_put = 0;
+	buf->sig_get = 0;
+
+	return (void *)buf;
+}
+
+
+int send_func(char *IP, int Port, SendBuffer_t *sendBuf)
 {
 	int err = 0;
 	pthread_t tid;
-	int 			   sendfd;
+	int 		    sendfd;
 	struct sockaddr_in servaddr;
 
 	memset(&servaddr, '\0', sizeof(servaddr));
@@ -55,17 +72,18 @@ static void *send_thread(void *arg)
 	uint8_t *nextFrame = (uint8_t *)malloc(1024);
 	while(1)
 	{
+		printf("send_thread started...\n");
 		sliceNum = 0;
 		nowLen = 0;
 		if(nextFrameFlag == 1){
-        	memcpy(frameHeader, nextFrame, sizeof(FrameHeader_t));
-        	nowFrameNo = ntohl(frameHeader->frame_no);
-        	memcpy(sendPac, nextFrame, sizeof(FrameHeader_t)+T);
+			memcpy(frameHeader, nextFrame, sizeof(FrameHeader_t));
+			nowFrameNo = ntohl(frameHeader->frame_no);
+			memcpy(sendPac, nextFrame, sizeof(FrameHeader_t)+T);
 
-            sliceNum++;
-		    nowLen = T + sizeof(FrameHeader_t) + sizeof(int);
-		    nextFrameFlag = 0;
-        }
+			sliceNum++;
+			nowLen = T + sizeof(FrameHeader_t) + sizeof(int);
+			nextFrameFlag = 0;
+		}
 
 		while(nowLen+T<=1024)
 		{
@@ -86,16 +104,16 @@ static void *send_thread(void *arg)
 			{
 				if(nowFrameNo == ntohl(frameHeader->frame_no))
 				{
-	        		memcpy(sendPac+nowLen, tempSlice+sizeof(FrameHeader_t), T);
-	        		sliceNum++;
-	        	    nowLen += T;
-	        	}
-	        	else
-	        	{
-	        		nextFrameFlag = 1;
-	        		memcpy(nextFrame, tempSlice, sizeof(FrameHeader_t)+T);
-	        		break;
-	        	}
+					memcpy(sendPac+nowLen, tempSlice+sizeof(FrameHeader_t), T);
+					sliceNum++;
+					nowLen += T;
+				}
+				else
+				{
+					nextFrameFlag = 1;
+					memcpy(nextFrame, tempSlice, sizeof(FrameHeader_t)+T);
+					break;
+				}
 			}
 		}
 
