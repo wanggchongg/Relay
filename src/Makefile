@@ -2,7 +2,7 @@ CC = gcc
 INC = ./
 LIB = ./
 
-CFLAGS = -I$(INC) -L$(LIB) -g -lm -lpthread -lrelay -Os -Wall
+CFLAGS = -I$(INC) -L$(LIB) -g -lpthread -lrelay -Os -Wall
 AR = ar rcu
 RANLIB = ranlib
 RM = -rm -f
@@ -16,7 +16,7 @@ TARGET = relay
 all: raptor $(TARGET)
 
 raptor:
-	cd ./Raptor && $(MAKE)
+	cd ./Raptor/ && $(MAKE)
 
 $(TARGET): $(RELAY_A)
 	$(CC) $(CFLAGS) -o $@
@@ -26,7 +26,7 @@ $(RELAY_A): $(RELAY_O)
 	$(RANLIB) $@
 
 .c.o:
-	$(CC) -c -I$(INC) $<
+	$(CC) -g -c -I$(INC) $<
 main.o: main.c
 recv_thread.o: recv_thread.c
 send_thread.o: send_thread.c

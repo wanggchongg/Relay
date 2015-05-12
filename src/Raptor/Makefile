@@ -2,7 +2,7 @@ CC = gcc
 INC = ./
 LIB = ./
 
-CFLAGS = -I$(INC) -g -c -lm -Os -Wall -std=gnu99
+CFLAGS = -I$(INC) -g -c -Os -Wall -std=gnu99
 AR = ar rcu
 RANLIB = ranlib
 RM = -rm -f
@@ -22,4 +22,4 @@ raptorcode.o: raptorcode.c
 clean:
 	$(RM) $(RAPTOR_A) $(RAPTOR_O)
 
-.PHONY: clean .c.o
+.PHONY: .c.o clean
