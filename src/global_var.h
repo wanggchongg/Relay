@@ -22,9 +22,10 @@ typedef struct FrameHeader_t
 	int camera_no;
 }FrameHeader_t;
 
-#define T_MAX 1024
-#define MAXLINE (sizeof(FrameHeader_t)+T_MAX)
-#define MAXBUFSIZE 2
+#define MAX_PAC_LEN 1024
+#define MAX_FRM_LEN 20000
+#define CODE_BUF_NUM 2
+#define SEND_BUF_NUM 20
 
 typedef struct
 {
@@ -65,8 +66,14 @@ typedef struct
 	sem_t sem_full;
 	int sig_put;
 	int sig_get;
-	uint8 *buffer;
+	uint8 **buffer;
 }SendBuffer_t;
+/*********************************************************************/
+
+/*********************************************************************/
+extern int Lost_default;
+extern int K_default;
+extern int T_default;
 /*********************************************************************/
 
 #endif //GLOBAL_VAR_H

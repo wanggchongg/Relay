@@ -69,19 +69,21 @@ static void *recv_thread(void *arg)
 	uint8_t *message = NULL;
 	ssize_t  mesglen = 0;
 
-	message = (uint8_t *)malloc(MAXLINE);
+	message = (uint8 *)malloc(MAX_PAC_LEN);
+	printf("recv_thread started...\n");
 	while(1)
 	{
-		printf("waiting for the UDP packet...\n");
+		//printf("waiting for the UDP packet...\n");
 
-		if((mesglen = recvfrom(listenfd, message, MAXLINE, 0, (struct sockaddr*)&cliaddr, &clilen)) < 0)
+		if((mesglen = recvfrom(listenfd, message, MAX_PAC_LEN, 0, (struct sockaddr*)&cliaddr, &clilen)) < 0)
 		{
 			fprintf(stderr, "\trecv_thread: UDP recvfrom error\n");
 			continue;
 		}
-		else if(mesglen >=2 && mesglen <= 4)
+		else if('#' == message[0])
 		{
 			sendto(listenfd, "###", 3, 0, (struct sockaddr*)&cliaddr, sizeof(cliaddr));
+			continue;
 		}
 		else if(mesglen == 0)
 		{
@@ -91,7 +93,8 @@ static void *recv_thread(void *arg)
 		sem_wait(&decodeBuf->sem_empty);
 		memcpy(decodeBuf->buffer[decodeBuf->sig_put], message, mesglen);
 		sem_post(&decodeBuf->sem_full);
-		decodeBuf->sig_put = (decodeBuf->sig_put + 1) % MAXBUFSIZE;
+		decodeBuf->sig_put = (decodeBuf->sig_put + 1) % CODE_BUF_NUM;
+		//printf("decodeBuf->sig_put=%d, recv_len=%d\n", decodeBuf->sig_put, mesglen);
 	}
 
 	free(message);

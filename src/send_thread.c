@@ -7,8 +7,15 @@ void *send_malloc(int buf_num, int buf_len)
 	SendBuffer_t *buf = NULL;
 	if((buf = (SendBuffer_t *)malloc(sizeof(SendBuffer_t))) == NULL)
 		return NULL;
-	if((buf->buffer = (uint8 *)malloc(buf_len)) == NULL)
+	if((buf->buffer = (uint8 **)malloc(buf_num*sizeof(uint8 *))) == NULL)
 		return NULL;
+
+	int i = 0;
+	for(i=0; i<buf_num; i++)
+	{
+		if((buf->buffer[i] = (uint8 *)malloc(buf_len)) == NULL)
+			return NULL;
+	}
 
 	sem_init(&buf->sem_empty, 0, buf_num);
 	sem_init(&buf->sem_full, 0, 0);
@@ -42,6 +49,12 @@ int send_func(char *IP, int Port, SendBuffer_t *sendBuf)
 		return -2;
 	}
 
+	if(connect(sendfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+	{
+		perror("\tsend_func: udp connect error");
+		return -2;
+	}
+
 	DoubleArg_t arg = {sendBuf, &sendfd};
 	err = pthread_create(&tid, NULL, send_thread, &arg);
 	if(err)
@@ -59,20 +72,22 @@ static void *send_thread(void *arg)
 	SendBuffer_t *sendBuf = (SendBuffer_t *)((DoubleArg_t *)arg)->arg1;
 	int sendfd = *(int *)((DoubleArg_t *)arg)->arg2;
 
-	uint8_t *sendPac = (uint8_t *)malloc(1024);
+	uint8_t *sendPac = (uint8_t *)malloc(MAX_PAC_LEN);
 	FrameHeader_t *frameHeader = (FrameHeader_t *)malloc(sizeof(FrameHeader_t));
 
-	int T = 128;
+	int T = T_default;
 	int sliceNum = 0;
 	int nowLen = 0;
 	int nowFrameNo = 0;
 	int nextFrameFlag = 0;
 
-	uint8_t *tempSlice = (uint8_t *)malloc(1024);
-	uint8_t *nextFrame = (uint8_t *)malloc(1024);
+	uint8_t *tempSlice = (uint8_t *)malloc(MAX_PAC_LEN);
+	uint8_t *nextFrame = (uint8_t *)malloc(MAX_PAC_LEN);
+
+	printf("send_thread started...\n");
 	while(1)
 	{
-		printf("send_thread started...\n");
+		//printf("send_thread started...\n");
 		sliceNum = 0;
 		nowLen = 0;
 		if(nextFrameFlag == 1){
@@ -85,12 +100,13 @@ static void *send_thread(void *arg)
 			nextFrameFlag = 0;
 		}
 
-		while(nowLen+T<=1024)
+		while(nowLen+T<=MAX_PAC_LEN)
 		{
 			sem_wait(&sendBuf->sem_full);
-			memcpy(tempSlice, sendBuf->buffer+sendBuf->sig_get*(T+sizeof(FrameHeader_t)), sizeof(FrameHeader_t)+T);
+			memcpy(tempSlice, sendBuf->buffer[sendBuf->sig_get], sizeof(FrameHeader_t)+T);
 			sem_post(&sendBuf->sem_empty);
-			sendBuf->sig_get = (sendBuf->sig_get + 1) % 20;
+			sendBuf->sig_get = (sendBuf->sig_get + 1) % SEND_BUF_NUM;
+			//printf("sendBuf->sig_get=%d\n", sendBuf->sig_get);
 
 			memcpy(frameHeader, tempSlice, sizeof(FrameHeader_t));
 
@@ -104,7 +120,7 @@ static void *send_thread(void *arg)
 			{
 				if(nowFrameNo == ntohl(frameHeader->frame_no))
 				{
-					memcpy(sendPac+nowLen, tempSlice+sizeof(FrameHeader_t), T);
+					memcpy(sendPac+nowLen, tempSlice + sizeof(FrameHeader_t), T);
 					sliceNum++;
 					nowLen += T;
 				}

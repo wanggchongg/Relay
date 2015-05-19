@@ -60,24 +60,26 @@ static void *encode_thread(void *arg)
 	FrameHeader_t *frameHeader = NULL;
 	uint8 *inputBuf = NULL, *intermediate = NULL, *outputBuf = NULL;
 
-	uint32 T = 128, K = 0, R = 0;
+	uint32 T = T_default, K = 0, R = 0;
 
 	RParamEnc_t *para;
 	para = (RParamEnc_t *)malloc(sizeof(RParamEnc_t));
-	raptor_init(500, 0, para, 0);
+	raptor_init(K_default, 0, para, 0);
+
+	printf("encode_thread started...\n");
 
 	while(1)
 	{
-		printf("encode_thread started...\n");
 		if(!frameBuf)
-			frameBuf = (uint8 *)malloc(20000);
+			frameBuf = (uint8 *)malloc(MAX_FRM_LEN);
 		sem_wait(&encodeBuf->sem_full);
 		frameSize = encodeBuf->frame[encodeBuf->sig_get]->size;
 		frameNo = encodeBuf->frame[encodeBuf->sig_get]->frameNo;
 		cameraNo = encodeBuf->frame[encodeBuf->sig_get]->cameraNo;
 		memcpy(frameBuf, encodeBuf->frame[encodeBuf->sig_get]->buffer, frameSize);
 		sem_post(&encodeBuf->sem_empty);
-		encodeBuf->sig_get = (encodeBuf->sig_get + 1) % MAXBUFSIZE;
+		encodeBuf->sig_get = (encodeBuf->sig_get + 1) % CODE_BUF_NUM;
+		//printf("encodeBuf->sig_get=%d\n", encodeBuf->sig_get);
 
 		K = (uint32)ceil(frameSize/T);
 		if(K<5) K = 5;
@@ -86,7 +88,7 @@ static void *encode_thread(void *arg)
 		raptor_reset(K, para, 0);
 
 		if(!inputBuf)
-			inputBuf = (uint8 *)malloc(50000);
+			inputBuf = (uint8 *)malloc(MAX_FRM_LEN * 2);
 		memset(inputBuf, 0, para->L*T);
 		memcpy(inputBuf+(para->S+para->H)*T, frameBuf, frameSize);
 
@@ -94,9 +96,9 @@ static void *encode_thread(void *arg)
 		frameBuf = NULL;
 
 		if(!intermediate)
-			intermediate = (uint8*)malloc(50100);
+			intermediate = (uint8*)malloc(MAX_FRM_LEN * 2);
 		if(!outputBuf)
-			outputBuf = (uint8 *)malloc(50000);
+			outputBuf = (uint8 *)malloc(MAX_FRM_LEN * 2);
 
 		if(raptor_encode(para, R, inputBuf, intermediate, outputBuf, T) == 0)
 		{
@@ -125,10 +127,11 @@ static void *encode_thread(void *arg)
 			frameHeader->esi = htonl(i);
 
 			sem_wait(&sendBuf->sem_empty);
-			memcpy(sendBuf->buffer+(T+sizeof(FrameHeader_t))*sendBuf->sig_put, frameHeader, sizeof(FrameHeader_t));
-			memcpy(sendBuf->buffer+(T+sizeof(FrameHeader_t))*sendBuf->sig_put+sizeof(FrameHeader_t), outputBuf+i*T, T);
-			sendBuf->sig_put = (sendBuf->sig_put+1)%20;
+			memcpy(sendBuf->buffer[sendBuf->sig_put], frameHeader, sizeof(FrameHeader_t));
+			memcpy(sendBuf->buffer[sendBuf->sig_put]+sizeof(FrameHeader_t), outputBuf+i*T, T);
 			sem_post(&sendBuf->sem_full);
+			sendBuf->sig_put = (sendBuf->sig_put+1) % SEND_BUF_NUM;
+			//printf("sendBuf->sig_put=%d\n", sendBuf->sig_put);
 		}//for
 		free(outputBuf);
 		outputBuf = NULL;

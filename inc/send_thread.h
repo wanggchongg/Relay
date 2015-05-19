@@ -1,16 +1,12 @@
 #ifndef SEND_THREAD_H
 #define SEND_THREAD_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <semaphore.h>
-#include <pthread.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include "global_var.h"
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 void *send_malloc(int buf_num, int buf_len);
-int send_func(uint8_t *, int, SendBuffer_t *);
+int send_func(char *, int, SendBuffer_t *);
 
 #endif //SEND_THREAD_H

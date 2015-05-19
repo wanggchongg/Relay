@@ -48,56 +48,66 @@ static void *decode_thread(void *arg)
 	EncodeBuffer_t *encodeBuf = (EncodeBuffer_t *)((DoubleArg_t *)arg)->arg2;
 	pthread_detach(pthread_self());
 
-	FrameHeader_t *frameHeader = NULL;
 	uint8 *inputBuf = NULL;
 	uint8 *outputBuf = NULL;
-	long inputBufSize = 0;
 	long outputBufSize = 0;
 
 	int K_old = 0, R_old = 0;
 
 	int cur_frame_no = -1;
 	int last_frame_no = 0;
-	int old_frame_no = -1;
 
 	uint32 raptor_K_recieve = 0;
-	uint32 raptor_R_recieve = 0;
 	uint32 raptor_N_recieve = 0;
 	uint32 raptor_K_temp = 0;
-	uint32 raptor_R_temp = 0;
 	uint32 raptor_N_temp = 0;
 
 	uint16 *list_cur = NULL;
 	uint16 list_temp = 0;
 
+	uint8 *message = (uint8 *)malloc(MAX_PAC_LEN);
+	FrameHeader_t *frameHeader = (FrameHeader_t *)malloc(sizeof(FrameHeader_t));
+	uint8 *frame_data = NULL;
+
 	int i, j;
+	int feed = 0;
 	printf("decode_thread started...\n");
 	while(1)
 	{
-		uint8 *tmp_buf_total = (uint8 *)malloc(MAXLINE);
 		sem_wait(&decodeBuf->sem_full);
-		memcpy(tmp_buf_total, decodeBuf->buffer[decodeBuf->sig_get], MAXLINE);
+		memcpy(message, decodeBuf->buffer[decodeBuf->sig_get], MAX_PAC_LEN);
 		sem_post(&decodeBuf->sem_empty);
-		decodeBuf->sig_get = (decodeBuf->sig_get + 1) % MAXBUFSIZE;
+		decodeBuf->sig_get = (decodeBuf->sig_get + 1) % CODE_BUF_NUM;
+		//printf("decodeBuf->sig_get=%d\n", decodeBuf->sig_get);
 
-		frameHeader = (FrameHeader_t *)malloc(sizeof(FrameHeader_t));
-		memcpy(frameHeader, tmp_buf_total, sizeof(FrameHeader_t));
+		/*************************************************************************/
+		// simulate lost packet
+		if(Lost_default)
+		{
+			feed = (feed +1)%1000;
+			srand(feed);
+			unsigned int rand_num = rand()%100;
+			if(rand_num <= Lost_default)
+				continue;
+		}
+		/**************************************************************************/
+
+		memcpy(frameHeader, message, sizeof(FrameHeader_t));
 
 		frameHeader->T = ntohl(frameHeader->T);
 		int T_cur = frameHeader->T;
 		frameHeader->slice_no = ntohl(frameHeader->slice_no);
 
 		int data_len;
-		memcpy(&data_len, tmp_buf_total+T_cur+sizeof(FrameHeader_t), 4);
+		memcpy(&data_len, message+T_cur+sizeof(FrameHeader_t), 4);
 		data_len = ntohl(data_len);
 
-		printf("data_len=%d\n", data_len);
+		//printf("data_len=%d\n", data_len);
 
+		if(!frame_data)
+			frame_data = (uint8 *)malloc(T_cur+1);
 		for(i=0; i<data_len+1; i++)
 		{
-			uint8 *frame_data = (uint8 *)malloc(T_cur+1);
-			memset(frame_data, 0, T_cur+1);
-
 			if(i == 0){
 				frameHeader->frame_no = ntohl(frameHeader->frame_no);
 				frameHeader->frame_type = ntohl(frameHeader->frame_type);
@@ -106,27 +116,20 @@ static void *decode_thread(void *arg)
 				frameHeader->R = ntohl(frameHeader->R);
 				frameHeader->esi = ntohl(frameHeader->esi);
 
-				memcpy(frame_data, tmp_buf_total+sizeof(FrameHeader_t), frameHeader->T);
-
-				if(i == data_len){
-					free(tmp_buf_total);
-					tmp_buf_total = NULL;
-				}
+				memcpy(frame_data, message+sizeof(FrameHeader_t), frameHeader->T);
 			}
 			else{
 				(frameHeader->slice_no)++;
 				(frameHeader->esi)++;
 
-				memcpy(frame_data, tmp_buf_total+i*T_cur+sizeof(FrameHeader_t)+sizeof(int), frameHeader->T);
-
-				if(i == data_len){
-					free(tmp_buf_total);
-					tmp_buf_total = NULL;
-				}
+				memcpy(frame_data, message+i*T_cur+sizeof(FrameHeader_t)+sizeof(int), frameHeader->T);
 			}
 
+			//printf("frame_no=%d, cur_frame_no=%d\n", frameHeader->frame_no, cur_frame_no);
+			//printf("frame_F=%d, frame_esi=%d\n", frameHeader->F, frameHeader->esi);
 			if(frameHeader->frame_no != cur_frame_no)//当收到的分片的帧号与预计收到的不同时 cur_frame_no 是当前应该收到的帧号
 			{//两种特殊情况：1.收到超前的分片 2.接收到已经过期的分片
+
 				if(frameHeader->frame_no > cur_frame_no)//情况1
 				{
 					last_frame_no = cur_frame_no;
@@ -137,17 +140,14 @@ static void *decode_thread(void *arg)
 
 						//保存上一帧的相关数据计数信息
 						raptor_K_recieve = raptor_K_temp;
-						raptor_R_recieve = raptor_R_temp;
 						raptor_N_recieve = raptor_N_temp;
 
 						//重新计数
 						raptor_K_temp = 0;
-						raptor_R_temp = 0;
 
 						if(frameHeader->esi < frameHeader->K)
 							raptor_K_temp = 1;
-						else
-							raptor_R_temp = 1;
+
 						raptor_N_temp = 1;
 
 						list_temp = frameHeader->esi;
@@ -171,17 +171,14 @@ static void *decode_thread(void *arg)
 
 							//保存上一帧的相关数据计数信息
 							raptor_K_recieve = raptor_K_temp;
-							raptor_R_recieve = raptor_R_temp;
 							raptor_N_recieve = raptor_N_temp;
 
 							//重新计数
 							raptor_K_temp = 0;
-							raptor_R_temp = 0;
 
 							if(frameHeader->esi < frameHeader->K)
 								raptor_K_temp = 1;
-							else
-								raptor_R_temp = 1;
+
 							raptor_N_temp = 1;
 
 							list_temp = frameHeader->esi;
@@ -206,8 +203,7 @@ static void *decode_thread(void *arg)
 
 					if(frameHeader->esi < frameHeader->K)
 						raptor_K_temp++;
-					else
-						raptor_R_temp++;
+
 					raptor_N_temp++;
 
 					if(!list_cur){
@@ -226,9 +222,6 @@ static void *decode_thread(void *arg)
 					}
 					memcpy(inputBuf+(raptor_N_temp-1)*T_cur, frame_data, T_cur);
 
-					free(frame_data);
-					frame_data = NULL;
-
 					continue;
 				}
 				else//非raptor
@@ -241,14 +234,12 @@ static void *decode_thread(void *arg)
 					outputBufSize = frameHeader->K*T_cur;
 					memcpy(outputBuf+frameHeader->esi*T_cur, frame_data, T_cur);//将数据copy到等待加入264解码队列的输入区
 
-					free(frame_data);
-					frame_data = NULL;
-
 					continue;//继续接收分片
 				}
 			}
 
 
+			//printf("start decode\n");
 			if(frameHeader->frame_type == 1)//raptor解码
 			{
 				int result_dec = 0;
@@ -269,6 +260,7 @@ static void *decode_thread(void *arg)
 
 						memcpy(outputBuf, inputBuf, outputBufSize);
 						outputBuf[outputBufSize] = '\0';
+						//printf("\tsatisfied K slice\n");
 					}
 					else
 					{
@@ -291,7 +283,7 @@ static void *decode_thread(void *arg)
 							result_dec = raptor_decode(para, temp, output, T_cur);
 							if(result_dec)
 							{
-								//cout<<"use raptor_decode && success"<<endl;
+								printf("use raptor_decode && success\n");
 								if(outputBuf)
 								{
 									free(outputBuf);
@@ -305,7 +297,7 @@ static void *decode_thread(void *arg)
 							}
 							else
 							{
-								//cout<<"raptor_decode error!!!"<<endl;
+								printf("use raptor_decode, but error!!!\n");
 								outputBufSize = (K_old+R_old)*T_cur;
 								if(outputBufSize)
 								{
@@ -333,7 +325,7 @@ static void *decode_thread(void *arg)
 						}
 						else //如果接收到的分片数不足，则将数据按esi存储进相应的位置
 						{
-							//cout<<"lack of raptor_decode's slice"<<endl;
+							printf("lack of raptor_decode's slice, and error\n");
 							outputBufSize = (K_old+R_old)*T_cur;
 							if(outputBufSize)
 							{
@@ -350,17 +342,17 @@ static void *decode_thread(void *arg)
 									memcpy(outputBuf+list_cur[j]*T_cur, inputBuf+j*T_cur, T_cur);
 								}
 							}
-						}
-					}
+						}//else
+					}//if
 				}
 
 				free(inputBuf);
 				inputBuf = NULL;
-				inputBufSize = 0;
 				K_old = 0;
 				R_old = 0;
 			}//raptor解码
 
+			//printf("outputBufSize=%d\n", outputBufSize);
 			///////////////////视频存储帧号可能不从1开始，因而导致视与源视频帧不对齐
 			if(outputBufSize)
 			{
@@ -370,8 +362,9 @@ static void *decode_thread(void *arg)
 				encodeBuf->frame[encodeBuf->sig_put]->size = outputBufSize;
 				memcpy(encodeBuf->frame[encodeBuf->sig_put]->buffer, outputBuf, outputBufSize);
 				sem_post(&encodeBuf->sem_full);
-				encodeBuf->sig_put = (encodeBuf->sig_put + 1) % MAXBUFSIZE;
+				encodeBuf->sig_put = (encodeBuf->sig_put + 1) % CODE_BUF_NUM;
 
+				//printf("\tframe_no=%d, out_buf_size = %d\n", last_frame_no, outputBufSize);
 				/*************************/
 				free(outputBuf);
 				outputBuf = NULL;
@@ -399,10 +392,6 @@ static void *decode_thread(void *arg)
 				/************************/
 
 				memcpy(inputBuf, frame_data, T_cur);
-				inputBufSize = T_cur;
-
-				free(frame_data);
-				frame_data = NULL;
 			}
 			else
 			{
@@ -413,14 +402,8 @@ static void *decode_thread(void *arg)
 
 				outputBufSize = frameHeader->K*T_cur;
 				memcpy(outputBuf+frameHeader->esi*T_cur, frame_data, T_cur);
-
-				free(frame_data);
-				frame_data = NULL;
 			}
 		}//for
-
-		free(frameHeader);
-		frameHeader = NULL;
 	}
 	pthread_exit((void *)0);
 }
