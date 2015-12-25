@@ -70,6 +70,23 @@ static void *recv_thread(void *arg)
 	ssize_t  mesglen = 0;
 
 	message = (uint8 *)malloc(MAX_PAC_LEN);
+
+	////////////////////////////////////////////////
+	int feed = 0;
+	uint32 rand_num;
+	////////////////////////////////////////////////
+
+
+
+	//////////////////////////////////////////////////////////////////
+	FrameHeader_t *frameHeader = (FrameHeader_t *)malloc(sizeof(FrameHeader_t));
+	int data_len = 0;
+	int cur_frame_no = -1;
+	double rate_loss_temp = 0;
+	uint32 slice_N = 1, slice_recv = 1;
+	//////////////////////////////////////////////////////////////////
+
+
 	printf("recv_thread started...\n");
 	while(1)
 	{
@@ -90,11 +107,48 @@ static void *recv_thread(void *arg)
 			continue;
 		}
 
-		sem_wait(&decodeBuf->sem_empty);
-		memcpy(decodeBuf->buffer[decodeBuf->sig_put], message, mesglen);
-		sem_post(&decodeBuf->sem_full);
-		decodeBuf->sig_put = (decodeBuf->sig_put + 1) % CODE_BUF_NUM;
-		//printf("decodeBuf->sig_put=%d, recv_len=%d\n", decodeBuf->sig_put, mesglen);
+		//////////////////////////////////////////////////////////////
+		// 模拟丢包
+		if (Lost_default) {
+			feed = (feed + 1) % 1000;
+			srand(feed);
+			rand_num = rand() % 100;
+			if (rand_num <= Lost_default)
+				continue;
+		}
+		//////////////////////////////////////////////////////////////
+
+
+		////////////////////////////////////////////////////////////////////////////
+		// 计算丢包率
+		memcpy(frameHeader, message, sizeof(FrameHeader_t));
+		frameHeader->T = ntohl(frameHeader->T);
+		memcpy(&data_len, message+frameHeader->T+sizeof(FrameHeader_t), 4);
+		data_len = ntohl(data_len);
+		frameHeader->frame_no = ntohl(frameHeader->frame_no);
+		if (cur_frame_no < frameHeader->frame_no) {
+			rate_loss_temp = 1 - (double) slice_recv / slice_N;
+			rate_loss = 0.75 * rate_loss + 0.25 * rate_loss_temp;
+			frameHeader->K = ntohl(frameHeader->K);
+			frameHeader->R = ntohl(frameHeader->R);
+			slice_N = frameHeader->K + frameHeader->R;
+			slice_recv = data_len + 1;
+			cur_frame_no = frameHeader->frame_no;
+		} else {
+			slice_recv += data_len + 1;
+		}
+		/////////////////////////////////////////////////////////////////////////////
+		
+		
+		if(mode) {
+			sem_wait(&decodeBuf->sem_empty);
+			memcpy(decodeBuf->buffer[decodeBuf->sig_put], message, mesglen);
+			sem_post(&decodeBuf->sem_full);
+			decodeBuf->sig_put = (decodeBuf->sig_put + 1) % CODE_BUF_NUM;
+			//printf("decodeBuf->sig_put=%d, recv_len=%d\n", decodeBuf->sig_put, mesglen);
+		} else {
+			send(sendfd, message, mesglen, 0);	
+		}
 	}
 
 	free(message);

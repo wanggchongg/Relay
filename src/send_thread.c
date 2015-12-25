@@ -30,8 +30,8 @@ int send_func(char *IP, int Port, SendBuffer_t *sendBuf)
 {
 	int err = 0;
 	pthread_t tid;
-	int 		    sendfd;
 	struct sockaddr_in servaddr;
+	struct timeval timeout;
 
 	memset(&servaddr, '\0', sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
@@ -46,6 +46,14 @@ int send_func(char *IP, int Port, SendBuffer_t *sendBuf)
 	if((sendfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 	{
 		perror("\tsend_func: UDP socket error");
+		return -2;
+	}
+
+	timeout.tv_sec = 1;
+	timeout.tv_usec = 0;
+
+	if(setsockopt(sendfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+		perror("\tsend_func: setsockopt error");
 		return -2;
 	}
 

@@ -5,5 +5,6 @@
 #include "decode_thread.h"
 #include "encode_thread.h"
 #include "send_thread.h"
+#include "heart_thread.h"
 
 #endif //MY_MAIN_H

@@ -70,7 +70,16 @@ static void *decode_thread(void *arg)
 	uint8 *frame_data = NULL;
 
 	int i, j;
-	int feed = 0;
+
+	///////////////////////////////////////////////////////////
+	long totalFrameNum = 100;
+	long failFrameNum = 0;
+	double rate_fail_temp = 0;
+
+	struct timeval t_start, t_end;
+	long cost_t_sec, cost_t_usec;
+	////////////////////////////////////////////////////////////
+
 	printf("decode_thread started...\n");
 	while(1)
 	{
@@ -79,18 +88,6 @@ static void *decode_thread(void *arg)
 		sem_post(&decodeBuf->sem_empty);
 		decodeBuf->sig_get = (decodeBuf->sig_get + 1) % CODE_BUF_NUM;
 		//printf("decodeBuf->sig_get=%d\n", decodeBuf->sig_get);
-
-		/*************************************************************************/
-		// simulate lost packet
-		if(Lost_default)
-		{
-			feed = (feed +1)%1000;
-			srand(feed);
-			unsigned int rand_num = rand()%100;
-			if(rand_num <= Lost_default)
-				continue;
-		}
-		/**************************************************************************/
 
 		memcpy(frameHeader, message, sizeof(FrameHeader_t));
 
@@ -132,6 +129,13 @@ static void *decode_thread(void *arg)
 
 				if(frameHeader->frame_no > cur_frame_no)//情况1
 				{
+					///////////////////////////////////////////////////////////////
+					totalFrameNum = (totalFrameNum + 1) % INT_MAX;
+					if (totalFrameNum > 0)
+						rate_fail_temp = (double)failFrameNum / totalFrameNum;
+					///////////////////////////////////////////////////////////////
+					
+					
 					last_frame_no = cur_frame_no;
 
 					if(frameHeader->frame_type == 1)//raptor
@@ -279,11 +283,28 @@ static void *decode_thread(void *arg)
 							memcpy(temp+(para->S+para->H)*T_cur,inputBuf, raptor_N_recieve*T_cur);
 
 							uint8 *output = (uint8 *)malloc(K_old*T_cur);
+							
+							///////////////////////////////////////////////////////
+							gettimeofday(&t_start, NULL);
+							///////////////////////////////////////////////////////
 
 							result_dec = raptor_decode(para, temp, output, T_cur);
+
+							////////////////////////////////////////////////////////
+							gettimeofday(&t_end, NULL);
+							cost_t_sec = t_end.tv_sec - t_start.tv_sec;
+							cost_t_usec = t_end.tv_usec - t_start.tv_usec;
+							if (cost_t_usec < 0) {
+								cost_t_usec += 1000000;
+								cost_t_sec -= 1;
+							}
+							time_dec_temp = cost_t_sec + 0.000001 * cost_t_usec;
+							////////////////////////////////////////////////////////
+
+
 							if(result_dec)
 							{
-								printf("use raptor_decode && success\n");
+								//printf("use raptor_decode && success\n");
 								if(outputBuf)
 								{
 									free(outputBuf);
@@ -297,7 +318,13 @@ static void *decode_thread(void *arg)
 							}
 							else
 							{
-								printf("use raptor_decode, but error!!!\n");
+								//////////////////////////////////////////////////////
+								failFrameNum = (failFrameNum + 1) % INT_MAX;
+								rate_fail = 0.75 * rate_fail + 0.25 * rate_fail_temp;
+								//////////////////////////////////////////////////////
+								
+								
+								//printf("use raptor_decode, but error!!!\n");
 								outputBufSize = (K_old+R_old)*T_cur;
 								if(outputBufSize)
 								{
@@ -325,7 +352,12 @@ static void *decode_thread(void *arg)
 						}
 						else //如果接收到的分片数不足，则将数据按esi存储进相应的位置
 						{
-							printf("lack of raptor_decode's slice, and error\n");
+							/////////////////////////////////////////////////////////
+							failFrameNum = (failFrameNum + 1) % INT_MAX;
+							rate_fail = 0.75 * rate_fail + 0.25 * rate_fail_temp;
+							/////////////////////////////////////////////////////////
+
+							//printf("lack of raptor_decode's slice, and error\n");
 							outputBufSize = (K_old+R_old)*T_cur;
 							if(outputBufSize)
 							{

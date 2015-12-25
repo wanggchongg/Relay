@@ -62,6 +62,11 @@ static void *encode_thread(void *arg)
 
 	uint32 T = T_default, K = 0, R = 0;
 
+	///////////////////////////////////////////////
+	struct timeval t_start, t_end;
+	long cost_t_sec, cost_t_usec;
+	///////////////////////////////////////////////
+
 	RParamEnc_t *para;
 	para = (RParamEnc_t *)malloc(sizeof(RParamEnc_t));
 	raptor_init(K_default, 0, para, 0);
@@ -80,6 +85,10 @@ static void *encode_thread(void *arg)
 		sem_post(&encodeBuf->sem_empty);
 		encodeBuf->sig_get = (encodeBuf->sig_get + 1) % CODE_BUF_NUM;
 		//printf("encodeBuf->sig_get=%d\n", encodeBuf->sig_get);
+	
+		///////////////////////////////////////////////////////
+		gettimeofday(&t_start, NULL);
+		///////////////////////////////////////////////////////
 
 		K = (uint32)ceil(frameSize/T);
 		if(K<5) K = 5;
@@ -105,6 +114,19 @@ static void *encode_thread(void *arg)
 			printf("encode error!\n");
 			continue;
 		}
+	
+		//////////////////////////////////////////////////////////////
+		gettimeofday(&t_end, NULL);
+		cost_t_sec = t_end.tv_sec - t_start.tv_sec;
+		cost_t_usec = t_end.tv_usec - t_start.tv_usec;
+		if (cost_t_usec < 0) {
+			cost_t_usec += 1000000;
+			cost_t_sec -= 1;
+		}
+		time_enc_temp = cost_t_sec + 0.000001 * cost_t_usec;
+		time_dec = 0.875 * time_dec + 0.125 * (time_enc_temp + time_dec_temp);
+		//////////////////////////////////////////////////////////////
+
 
 		free(intermediate);
 		intermediate = NULL;

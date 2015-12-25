@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <limits.h>
+#include <time.h>
 
 typedef struct FrameHeader_t
 {
@@ -71,9 +73,22 @@ typedef struct
 /*********************************************************************/
 
 /*********************************************************************/
+extern char IP_default[];
+extern int Port_default;
 extern int Lost_default;
 extern int K_default;
 extern int T_default;
+
+extern int sendfd;
+extern int node_id;
+extern int mode;
+extern double rtt;
+extern double time_dec;
+extern double rate_loss;
+extern double rate_fail;
+extern double time_dec_temp;
+extern double time_enc_temp;
 /*********************************************************************/
 
 #endif //GLOBAL_VAR_H
+
